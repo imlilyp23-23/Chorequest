@@ -1,0 +1,1129 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ChoreQuest - Gamified Chore Management (Firebase)</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+
+  <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-firestore-compat.js"></script>
+  <style>
+    /* Dark theme with Bootstrap */
+    :root {
+      --bs-body-bg: #212529;
+      --bs-body-color: #f8f9fa;
+      --bs-primary: #0d6efd;
+      --bs-primary-rgb: 13, 110, 253;
+      --bs-secondary: #6c757d;
+      --bs-success: #198754;
+      --bs-info: #0dcaf0;
+      --bs-warning: #ffc107;
+      --bs-danger: #dc3545;
+      --bs-light: #f8f9fa;
+      --bs-dark: #212529;
+      --bs-white: #fff;
+    }
+    body {
+      background-color: var(--bs-body-bg);
+      color: var(--bs-body-color);
+      padding-bottom: 2rem;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    }
+    /* Card overrides */
+    .card {
+      transition: transform 0.2s;
+      margin-bottom: 1.5rem;
+      background-color: #2c3036;
+      border-color: rgba(255, 255, 255, 0.1);
+    }
+    .card:hover {
+      transform: translateY(-5px);
+    }
+    .card-header {
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    /* Chat styling */
+    .chat-log, .activity-log {
+      height: 200px;
+      overflow-y: auto;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      background-color: #2c3036;
+      border-radius: 6px;
+    }
+    .log-item {
+      padding: 0.5rem;
+      margin-bottom: 0.5rem;
+      border-radius: 6px;
+      background-color: rgba(255, 255, 255, 0.05);
+    }
+    .log-item:last-child {
+      margin-bottom: 0;
+    }
+    /* XP progress bar custom styling */
+    .progress {
+      background-color: rgba(0, 0, 0, 0.2);
+    }
+    /* Chore item styling */
+    #choreList .list-group-item {
+      transition: background-color 0.3s;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background-color: #2c3036;
+      border-color: rgba(255, 255, 255, 0.1);
+      color: var(--bs-body-color);
+    }
+    #choreList .list-group-item:hover {
+      background-color: rgba(13, 110, 253, 0.1);
+    }
+    /* Animation for completing quests */
+    @keyframes complete-animation {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.1); }
+      100% { transform: scale(1); }
+    }
+    .complete-animation {
+      animation: complete-animation 0.5s ease-in-out;
+    }
+    /* Player stats section */
+    .player-stats {
+      border-left: 4px solid var(--bs-info);
+    }
+    /* Scrollbar styling */
+    ::-webkit-scrollbar {
+      width: 8px;
+    }
+    ::-webkit-scrollbar-track {
+      background: rgba(0, 0, 0, 0.1);
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(13, 110, 253, 0.5);
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(13, 110, 253, 0.8);
+    }
+    /* Message styling */
+    .player-message, .parent-message {
+      padding: 8px 12px;
+      margin-bottom: 8px;
+      border-radius: 8px;
+      max-width: 85%;
+      word-wrap: break-word; /* Ensure long messages wrap */
+    }
+    .player-message {
+      background-color: rgba(13, 202, 240, 0.2);
+      margin-right: auto;
+      text-align: left;
+    }
+    .parent-message {
+      background-color: rgba(25, 135, 84, 0.2);
+      margin-left: auto;
+      text-align: right;
+    }
+    /* Empty state styling */
+    .empty-state {
+      text-align: center;
+      padding: 2rem;
+      color: var(--bs-secondary);
+    }
+    /* Level up animation */
+    @keyframes level-up {
+      0% { transform: scale(1); opacity: 1; }
+      50% { transform: scale(1.5); opacity: 0.8; }
+      100% { transform: scale(1); opacity: 1; }
+    }
+    .level-up-animation {
+      animation: level-up 1s ease-in-out;
+      color: var(--bs-warning);
+    }
+    /* Role cards */
+    .role-card {
+      transition: transform 0.3s, box-shadow 0.3s;
+    }
+    .role-card:hover {
+      transform: translateY(-10px);
+      box-shadow: 0 10px 20px rgba(0, 0, 0, 0.3);
+    }
+    /* Connection code styling */
+    #connectionCode {
+      letter-spacing: 0.5rem;
+      text-align: center;
+    }
+    #codeInput {
+      letter-spacing: 0.5rem;
+      font-size: 2rem;
+    }
+    /* Responsive adjustments */
+    @media (max-width: 767.98px) {
+      .player-stats .progress {
+        width: 100%;
+        margin-top: 10px;
+      }
+      .player-stats {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+      #connectionCode, #codeInput {
+        letter-spacing: 0.3rem;
+        font-size: 1.5rem;
+      }
+    }
+    /* Toast for status messages */
+    .toast-container {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      z-index: 9999;
+    }
+    /* Pulse animation for connection indicator */
+    @keyframes pulse {
+      0% { transform: scale(1); opacity: 1; }
+      50% { transform: scale(1.1); opacity: 0.8; }
+      100% { transform: scale(1); opacity: 1; }
+    }
+    .connection-indicator.connected .fa-wifi {
+      animation: pulse 2s infinite;
+      color: var(--bs-success);
+    }
+     .connection-indicator.disconnected .fa-wifi {
+       color: var(--bs-danger);
+     }
+     .connection-indicator small {
+        vertical-align: middle;
+        margin-left: 5px;
+     }
+  </style>
+</head>
+<body>
+  <div class="container py-4">
+    <header class="mb-4 text-center">
+      <h1 class="display-4"><i class="fas fa-trophy text-warning"></i> ChoreQuest</h1>
+      <p class="lead">Turn everyday chores into epic quests</p>
+    </header>
+
+    <div id="roleSelection" class="row justify-content-center mb-5">
+      <div class="col-md-8">
+        <div class="card shadow-lg border-warning">
+          <div class="card-header bg-warning bg-opacity-75 text-dark">
+            <h2 class="card-title mb-0">Choose Your Role</h2>
+          </div>
+          <div class="card-body text-center py-5">
+            <div class="row">
+              <div class="col-md-6 mb-3 mb-md-0">
+                <div class="role-card p-4 rounded border border-primary h-100">
+                  <i class="fas fa-gamepad fa-3x text-primary mb-3"></i>
+                  <h3>Player</h3>
+                  <p>Complete quests, earn XP, and level up</p>
+                  <button class="btn btn-lg btn-primary" onclick="selectRole('player')">
+                    <i class="fas fa-user-check me-2"></i> Select Player
+                  </button>
+                </div>
+              </div>
+              <div class="col-md-6">
+                <div class="role-card p-4 rounded border border-success h-100">
+                  <i class="fas fa-crown fa-3x text-success mb-3"></i>
+                  <h3>Parent</h3>
+                  <p>Create quests and monitor progress</p>
+                  <button class="btn btn-lg btn-success" onclick="selectRole('parent')">
+                    <i class="fas fa-user-check me-2"></i> Select Parent
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="connectionSetup" class="row justify-content-center mb-5 d-none">
+       <div class="col-md-8">
+        <div class="card shadow-lg border-info">
+          <div class="card-header bg-info bg-opacity-75">
+            <h2 class="card-title mb-0" id="connectionHeader">Connect with Code</h2>
+          </div>
+          <div class="card-body text-center py-4">
+            <div id="createCodeSection" class="mb-4 d-none">
+              <h3>Your Connection Code</h3>
+              <div class="d-flex justify-content-center align-items-center gap-3 mb-3">
+                <span id="connectionCode" class="display-6 font-monospace text-warning bg-dark p-3 rounded">----</span>
+                <button class="btn btn-sm btn-secondary" onclick="generateCode()">
+                  <i class="fas fa-sync-alt"></i> New Code
+                </button>
+              </div>
+              <p>Share this code with the other person to connect</p>
+              <button class="btn btn-primary" onclick="setupConnection(true)">
+                <i class="fas fa-check-circle me-2"></i> Create & Connect
+              </button>
+            </div>
+            <div id="enterCodeSection" class="mb-4 d-none">
+              <h3>Enter Connection Code</h3>
+              <div class="d-flex justify-content-center align-items-center gap-3 mb-3">
+                <input type="text" id="codeInput" class="form-control form-control-lg font-monospace text-center"
+                   placeholder="Enter 4-digit code" maxlength="4" style="max-width: 200px;">
+              </div>
+              <p>Enter the code shared by the other person</p>
+              <button class="btn btn-primary" onclick="setupConnection(false)">
+                <i class="fas fa-link me-2"></i> Connect
+              </button>
+            </div>
+            <div id="connectingIndicator" class="text-center d-none">
+                 <div class="spinner-border text-info" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                 </div>
+                 <p class="mt-2">Connecting...</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="mainContent" class="row g-4 d-none">
+      <div id="playerView" class="col-md-12 d-none">
+        <div class="card shadow-lg border-primary h-100">
+           <div class="card-header bg-primary bg-opacity-75 d-flex justify-content-between align-items-center">
+                <h2 class="card-title mb-0">
+                  <i class="fas fa-gamepad me-2"></i> Player View
+                </h2>
+                 <div id="playerConnectionIndicator" class="connection-indicator disconnected">
+                   <i class="fas fa-wifi"></i> <small>Code: <span id="playerConnectedCode">----</span></small>
+                 </div>
+            </div>
+          <div class="card-body">
+            <div class="player-stats bg-opacity-50 p-3 rounded mb-3">
+              <div class="d-flex justify-content-between align-items-center flex-wrap">
+                <div>
+                  <h5 class="mb-0">Level: <span id="playerLevel" class="badge bg-info">1</span></h5>
+                </div>
+                <div class="progress flex-grow-1 mx-md-3 my-2 my-md-0" style="height: 20px; min-width: 150px;">
+                  <div id="xpProgressBar" class="progress-bar progress-bar-striped progress-bar-animated bg-success"
+                        role="progressbar" style="width: 0%;"
+                        aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">
+                    <span id="playerXP">0</span> XP
+                  </div>
+                </div>
+                <div>
+                  <span class="badge rounded-pill bg-warning text-dark">
+                    Next Lvl: <span id="xpNeeded">50</span> XP
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div class="quests mb-4">
+              <h4><i class="fas fa-scroll me-2 text-warning"></i> Active Quests</h4>
+              <ul id="choreList" class="list-group">
+                 <li class="list-group-item empty-state">Loading quests...</li>
+              </ul>
+              <div id="emptyChores" class="empty-state d-none">
+                <i class="fas fa-check-circle fa-3x text-muted mb-2"></i>
+                <p>All quests complete! Ask the Quest Master (parent) for more adventures.</p>
+              </div>
+            </div>
+
+            <div class="chat-section">
+              <h4><i class="fas fa-comments me-2 text-info"></i> Chat with Quest Master</h4>
+              <div id="chatLog" class="chat-log mb-3 p-2 rounded">
+                  <div class="log-item text-muted">Connecting to chat...</div>
+              </div>
+              <div class="input-group">
+                <input type="text" id="playerMessage" class="form-control" placeholder="Type message...">
+                <button class="btn btn-info" onclick="sendMessage('player')">
+                  <i class="fas fa-paper-plane"></i> Send
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div id="parentView" class="col-md-12 d-none">
+        <div class="card shadow-lg border-secondary h-100">
+            <div class="card-header bg-secondary bg-opacity-75 d-flex justify-content-between align-items-center">
+                <h2 class="card-title mb-0">
+                  <i class="fas fa-crown me-2"></i> Parent View
+                </h2>
+                <div id="parentConnectionIndicator" class="connection-indicator disconnected">
+                   <i class="fas fa-wifi"></i> <small>Code: <span id="parentConnectedCode">----</span></small>
+                 </div>
+            </div>
+          <div class="card-body">
+            <div class="add-chore mb-4">
+              <h4><i class="fas fa-plus-circle me-2 text-success"></i> Add New Quest</h4>
+              <div class="input-group mb-3">
+                <input type="text" id="newChore" class="form-control" placeholder="Enter a new chore description...">
+                <button class="btn btn-success" onclick="addChore()">
+                  <i class="fas fa-plus"></i> Add Quest
+                </button>
+              </div>
+              <div class="form-text">Create meaningful quests that are clear and achievable.</div>
+            </div>
+
+            <div class="activity-section mb-4">
+              <h4><i class="fas fa-history me-2 text-warning"></i> Adventure Log</h4>
+              <div id="activityLog" class="activity-log p-2 rounded mb-3">
+                    <div class="log-item text-muted">Loading activity log...</div>
+              </div>
+            </div>
+
+            <div class="chat-section">
+              <h4><i class="fas fa-comments me-2 text-info"></i> Chat with Player</h4>
+              <div id="chatLogParent" class="chat-log mb-3 p-2 rounded">
+                   <div class="log-item text-muted">Connecting to chat...</div>
+              </div>
+              <div class="input-group">
+                <input type="text" id="parentMessage" class="form-control" placeholder="Type message...">
+                <button class="btn btn-info" onclick="sendMessage('parent')">
+                  <i class="fas fa-paper-plane"></i> Send
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div> <footer class="mt-4 text-center text-muted">
+      <p>ChoreQuest &copy; 2023-2025 - Making chores fun through gamification</p>
+    </footer>
+  </div> <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+  <script>
+    /**
+     * ChoreQuest - A gamified chore management application with connection codes
+     * Main JavaScript functionality using Firebase Firestore
+     */
+
+    // --- Firebase Configuration ---
+    // IMPORTANT: Replace with your project's actual Firebase configuration!
+    // You can find this in your Firebase project settings -> General -> Your apps -> Web app
+    const firebaseConfig = {
+      apiKey: "AIzaSyAiCTw1K0nrFN5bvy_G318NScwx3CtAjfM", // REPLACE
+      authDomain: "lilyp23-5bda9.firebaseapp.com", // REPLACE
+      projectId: "lilyp23-5bda9", // REPLACE
+      storageBucket: "lilyp23-5bda9.firebasestorage.app", // REPLACE
+      messagingSenderId: "652497217662", // REPLACE
+      appId: "1:652497217662:web:15b3988bc6a3a019ef902f" // REPLACE
+    };
+    // --- End Firebase Configuration ---
+
+
+    // Initialize Firebase
+    let db; // Firestore database instance
+    try {
+        firebase.initializeApp(firebaseConfig);
+        db = firebase.firestore();
+        console.log("Firebase Initialized Successfully");
+    } catch (e) {
+        console.error("Error initializing Firebase: ", e);
+        showToast("Error connecting to backend services. Please refresh.", "danger");
+        // Optionally disable parts of the UI if Firebase fails to init
+    }
+
+
+    // Application state
+    let currentRole = null; // 'player' or 'parent'
+    let connectionCode = null; // The 4-digit code used for the connection
+    let unsubscribeFromUpdates = null; // Function to stop the Firestore listener
+
+    // Constants for game mechanics
+    const XP_PER_CHORE = 10;
+    const LEVEL_MULTIPLIER = 50;
+    const CONNECTIONS_COLLECTION = 'connections'; // Firestore collection name
+
+
+    /**
+     * Select a role (player or parent) - UI Logic
+     */
+    function selectRole(role) {
+      currentRole = role;
+      document.getElementById('roleSelection').classList.add('d-none');
+      document.getElementById('connectionSetup').classList.remove('d-none');
+      document.getElementById('connectingIndicator').classList.add('d-none'); // Hide connecting indicator
+
+      if (role === 'parent') {
+        document.getElementById('createCodeSection').classList.remove('d-none');
+        document.getElementById('enterCodeSection').classList.add('d-none');
+        document.getElementById('connectionHeader').innerHTML = 'Create Connection Code';
+        generateCode(); // Generate initial code for the parent
+      } else {
+        document.getElementById('enterCodeSection').classList.remove('d-none');
+        document.getElementById('createCodeSection').classList.add('d-none');
+        document.getElementById('connectionHeader').innerHTML = 'Enter Connection Code';
+         document.getElementById('codeInput').focus();
+      }
+    }
+
+    /**
+     * Generate a random 4-digit connection code (client-side)
+     */
+    function generateCode() {
+      const code = Math.floor(1000 + Math.random() * 9000).toString();
+      document.getElementById('connectionCode').textContent = code;
+      // Temporarily store generated code for parent to use when setting up connection
+      connectionCode = code;
+    }
+
+    /**
+     * Setup the connection using Firebase Firestore
+     * @param {boolean} isCreator - True if the current user is the parent creating the code
+     */
+    async function setupConnection(isCreator) {
+       if (!db) {
+            showToast("Backend service not available. Please refresh.", "danger");
+            return;
+       }
+
+       // Show connecting indicator, hide input sections
+       document.getElementById('connectingIndicator').classList.remove('d-none');
+       document.getElementById('createCodeSection').classList.add('d-none');
+       document.getElementById('enterCodeSection').classList.add('d-none');
+
+      if (isCreator) {
+        // --- Parent creating the connection ---
+        if (!connectionCode) {
+          showToast('Please generate a connection code first', 'warning');
+          document.getElementById('connectingIndicator').classList.add('d-none');
+          document.getElementById('createCodeSection').classList.remove('d-none'); // Show section again
+          return;
+        }
+
+        const codeToUse = connectionCode; // Use the generated code
+        const connectionRef = db.collection(CONNECTIONS_COLLECTION).doc(codeToUse);
+
+        try {
+            // Check if code already exists (unlikely but possible)
+             const docSnap = await connectionRef.get();
+             if (docSnap.exists) {
+                 showToast(`Code ${codeToUse} already in use. Generate a new code.`, 'warning');
+                 document.getElementById('connectingIndicator').classList.add('d-none');
+                 document.getElementById('createCodeSection').classList.remove('d-none');
+                 generateCode(); // Generate a new one automatically
+                 return;
+             }
+
+            // Create the initial document in Firestore
+            const initialData = {
+              chores: [],
+              xp: 0,
+              level: 1,
+              chat: [],
+              activity: [`Connection created with code ${codeToUse}`],
+              createdAt: firebase.firestore.FieldValue.serverTimestamp() // Use server time
+            };
+            await connectionRef.set(initialData);
+
+            console.log(`Connection created with code: ${codeToUse}`);
+            showToast(`Connection created successfully with code ${codeToUse}`, 'success');
+
+            // Start listening for real-time updates
+            startListening(codeToUse);
+
+            // Show the parent view
+            document.getElementById('connectionSetup').classList.add('d-none');
+            document.getElementById('mainContent').classList.remove('d-none');
+            document.getElementById('parentView').classList.remove('d-none');
+            document.getElementById('playerView').classList.add('d-none');
+            document.getElementById('parentConnectedCode').textContent = codeToUse;
+
+        } catch (error) {
+            console.error("Error creating connection:", error);
+            showToast(`Failed to create connection: ${error.message}`, 'danger');
+            document.getElementById('connectingIndicator').classList.add('d-none');
+            document.getElementById('createCodeSection').classList.remove('d-none'); // Show create section again
+        }
+
+      } else {
+        // --- Player joining with a code ---
+        const enteredCode = document.getElementById('codeInput').value.trim();
+
+        if (!/^\d{4}$/.test(enteredCode)) {
+          showToast('Please enter a valid 4-digit code', 'warning');
+          document.getElementById('connectingIndicator').classList.add('d-none');
+          document.getElementById('enterCodeSection').classList.remove('d-none'); // Show enter section again
+          return;
+        }
+
+        const connectionRef = db.collection(CONNECTIONS_COLLECTION).doc(enteredCode);
+
+        try {
+            const docSnap = await connectionRef.get();
+
+            if (docSnap.exists) {
+                console.log(`Connecting to existing connection: ${enteredCode}`);
+                connectionCode = enteredCode; // Set the active connection code
+
+                // Add an activity log entry for player joining
+                await connectionRef.update({
+                    activity: firebase.firestore.FieldValue.arrayUnion(`Player joined connection.`)
+                });
+
+                 showToast(`Connected successfully with code ${enteredCode}`, 'success');
+
+                // Start listening for real-time updates
+                startListening(enteredCode);
+
+                // Show the player view
+                document.getElementById('connectionSetup').classList.add('d-none');
+                document.getElementById('mainContent').classList.remove('d-none');
+                document.getElementById('playerView').classList.remove('d-none');
+                document.getElementById('parentView').classList.add('d-none');
+                document.getElementById('playerConnectedCode').textContent = enteredCode;
+
+            } else {
+                console.warn(`Connection code not found: ${enteredCode}`);
+                showToast('Connection code not found. Please check the code and try again.', 'danger');
+                document.getElementById('connectingIndicator').classList.add('d-none');
+                document.getElementById('enterCodeSection').classList.remove('d-none'); // Show enter section again
+            }
+        } catch (error) {
+            console.error("Error checking connection code:", error);
+            showToast(`Failed to connect: ${error.message}`, 'danger');
+            document.getElementById('connectingIndicator').classList.add('d-none');
+            document.getElementById('enterCodeSection').classList.remove('d-none'); // Show enter section again
+        }
+      }
+    }
+
+
+    /**
+     * Start listening for real-time updates from Firestore
+     * @param {string} code - The connection code (document ID) to listen to
+     */
+    function startListening(code) {
+      if (!db) return;
+
+      // Stop any previous listener
+      if (unsubscribeFromUpdates) {
+        console.log("Stopping previous listener.");
+        unsubscribeFromUpdates();
+        unsubscribeFromUpdates = null;
+      }
+
+      console.log(`Starting listener for connection code: ${code}`);
+      const connectionRef = db.collection(CONNECTIONS_COLLECTION).doc(code);
+
+      unsubscribeFromUpdates = connectionRef.onSnapshot((doc) => {
+        if (doc.exists) {
+          console.log("Received data update:", doc.data());
+          const connectionData = doc.data();
+          // Update the entire UI based on the latest data
+          renderAll(connectionData);
+           updateConnectionIndicator(true); // Mark as connected
+        } else {
+          // This means the document was deleted (e.g., connection ended?)
+          console.warn(`Connection document ${code} does not exist or was deleted.`);
+          showToast("Connection lost or ended. Please reconnect.", "warning");
+          // Optionally reset the UI back to role selection or connection setup
+          resetUI();
+           updateConnectionIndicator(false); // Mark as disconnected
+        }
+      }, (error) => {
+        console.error(`Error listening to connection ${code}:`, error);
+        showToast("Connection error. Please check your internet and refresh.", "danger");
+        updateConnectionIndicator(false); // Mark as disconnected
+        // Optionally try to reconnect or reset UI
+      });
+    }
+
+     /**
+      * Updates the connection status indicator icon and text
+      * @param {boolean} isConnected
+      */
+     function updateConnectionIndicator(isConnected) {
+        const indicators = document.querySelectorAll('.connection-indicator');
+        indicators.forEach(indicator => {
+            if (isConnected) {
+                indicator.classList.remove('disconnected');
+                indicator.classList.add('connected');
+                indicator.querySelector('i').classList.remove('text-danger');
+                indicator.querySelector('i').classList.add('text-success');
+
+            } else {
+                 indicator.classList.remove('connected');
+                 indicator.classList.add('disconnected');
+                 indicator.querySelector('i').classList.remove('text-success');
+                 indicator.querySelector('i').classList.add('text-danger');
+            }
+        });
+     }
+
+
+     /**
+     * Reset UI to the initial role selection state
+     */
+    function resetUI() {
+        if (unsubscribeFromUpdates) {
+            unsubscribeFromUpdates();
+            unsubscribeFromUpdates = null;
+        }
+        currentRole = null;
+        connectionCode = null;
+
+        document.getElementById('roleSelection').classList.remove('d-none');
+        document.getElementById('connectionSetup').classList.add('d-none');
+        document.getElementById('mainContent').classList.add('d-none');
+        document.getElementById('playerView').classList.add('d-none');
+        document.getElementById('parentView').classList.add('d-none');
+        document.getElementById('connectingIndicator').classList.add('d-none');
+
+        // Clear dynamic content areas
+        document.getElementById('choreList').innerHTML = '';
+        document.getElementById('chatLog').innerHTML = '';
+        document.getElementById('activityLog').innerHTML = '';
+        document.getElementById('chatLogParent').innerHTML = '';
+        document.getElementById('playerConnectedCode').textContent = '----';
+        document.getElementById('parentConnectedCode').textContent = '----';
+        updateConnectionIndicator(false);
+        console.log("UI Reset");
+    }
+
+
+    /**
+     * Show a toast notification (Bootstrap 5)
+     */
+    function showToast(message, type = 'info') {
+      // Ensure container exists
+      let toastContainer = document.querySelector('.toast-container');
+      if (!toastContainer) {
+        toastContainer = document.createElement('div');
+        toastContainer.className = 'toast-container';
+        document.body.appendChild(toastContainer);
+      }
+
+      const toastId = `toast-${Date.now()}`; // Unique ID for each toast
+      const toast = document.createElement('div');
+      toast.id = toastId;
+      toast.className = `toast align-items-center text-bg-${type} border-0`; // Removed 'show' initially
+      toast.setAttribute('role', 'alert');
+      toast.setAttribute('aria-live', 'assertive');
+      toast.setAttribute('aria-atomic', 'true');
+      toast.innerHTML = `
+        <div class="d-flex">
+          <div class="toast-body">
+            ${message}
+          </div>
+          <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+        </div>
+      `;
+
+      toastContainer.appendChild(toast);
+
+      // Use Bootstrap's Toast component instance
+      const toastElement = document.getElementById(toastId);
+      const bsToast = new bootstrap.Toast(toastElement, { delay: 3000 });
+      bsToast.show();
+
+      // Optional: Remove the element after it's hidden to prevent DOM clutter
+      toastElement.addEventListener('hidden.bs.toast', () => {
+        toastElement.remove();
+      });
+    }
+
+
+    /**
+     * Render all UI elements based on the provided data
+     * @param {object} currentData - The data object from Firestore
+     */
+    function renderAll(currentData) {
+      if (!currentData) return; // Exit if no data
+
+      // Ensure defaults if properties are missing (e.g., newly created doc)
+      const chores = currentData.chores || [];
+      const xp = currentData.xp || 0;
+      const level = currentData.level || 1;
+      const chat = currentData.chat || [];
+      const activity = currentData.activity || [];
+
+      renderChores(chores);
+      renderXP(xp, level);
+      renderChat(chat);
+      renderActivity(activity);
+    }
+
+
+    /**
+     * Render chores list
+     * @param {string[]} choresData - Array of chore strings
+     */
+    function renderChores(choresData) {
+      const choreList = document.getElementById("choreList");
+      const emptyChores = document.getElementById("emptyChores");
+
+      if (!choreList || !emptyChores) return; // Views might not be loaded
+
+      choreList.innerHTML = ""; // Clear previous list
+
+      if (choresData.length === 0) {
+        emptyChores.classList.remove("d-none");
+        choreList.classList.add("d-none"); // Hide the list itself if empty
+      } else {
+        emptyChores.classList.add("d-none");
+         choreList.classList.remove("d-none"); // Ensure list is visible
+
+        choresData.forEach((chore, index) => {
+          const li = document.createElement("li");
+          li.className = "list-group-item d-flex justify-content-between align-items-center";
+          li.innerHTML = `
+            <div>
+              <i class="fas fa-scroll text-warning me-2"></i>
+              <span>${escapeHtml(chore)}</span>
+            </div>
+            ${currentRole === 'player' ? // Only show complete button for player
+              `<button class="btn btn-success btn-sm" onclick="completeChore('${index}', '${escapeHtml(chore)}')">
+                 <i class="fas fa-check me-1"></i> Complete
+               </button>` :
+              '' // No button for parent view
+            }
+          `;
+          choreList.appendChild(li);
+        });
+      }
+    }
+
+    /**
+     * Calculate XP needed for next level
+     * @param {number} currentLevel
+     */
+    function calculateXPNeeded(currentLevel) {
+      return currentLevel * LEVEL_MULTIPLIER;
+    }
+
+    /**
+     * Render XP and level
+     * @param {number} currentXP
+     * @param {number} currentLevel
+     */
+    function renderXP(currentXP, currentLevel) {
+      const playerLevelEl = document.getElementById("playerLevel");
+      if (!playerLevelEl) return; // Player view might not be active
+
+      const xpNeeded = calculateXPNeeded(currentLevel);
+      const xpPercentage = xpNeeded > 0 ? Math.min(100, (currentXP / xpNeeded) * 100) : 0; // Avoid divide by zero, cap at 100
+
+      document.getElementById("playerXP").innerText = currentXP;
+      document.getElementById("playerLevel").innerText = currentLevel;
+      document.getElementById("xpNeeded").innerText = xpNeeded;
+
+      const progressBar = document.getElementById("xpProgressBar");
+      progressBar.style.width = `${xpPercentage}%`;
+      progressBar.setAttribute("aria-valuenow", xpPercentage);
+    }
+
+    /**
+     * Render chat messages
+     * @param {object[]} chatData - Array of chat message objects {who, text, timestamp}
+     */
+    function renderChat(chatData) {
+      const formatChatMessage = (msg) => {
+        if (!msg || !msg.who || !msg.text) return ''; // Basic validation
+        const isPlayer = msg.who === "player";
+        const className = isPlayer ? "player-message" : "parent-message";
+        const name = isPlayer ? "Player" : "Parent";
+        const timestamp = msg.timestamp ? new Date(msg.timestamp.toDate()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''; // Format timestamp
+
+        return `
+          <div class="log-item ${className}">
+            <div><strong>${escapeHtml(name)}:</strong> ${escapeHtml(msg.text)}</div>
+            ${timestamp ? `<small class="text-muted d-block mt-1">${timestamp}</small>` : ''}
+          </div>
+        `;
+      };
+
+      // Player view chat
+      const chatLogPlayer = document.getElementById("chatLog");
+      if (chatLogPlayer) {
+        chatLogPlayer.innerHTML = chatData.map(formatChatMessage).join("");
+        chatLogPlayer.scrollTop = chatLogPlayer.scrollHeight; // Scroll to bottom
+      }
+
+      // Parent view chat
+      const chatLogParent = document.getElementById("chatLogParent");
+      if (chatLogParent) {
+        chatLogParent.innerHTML = chatData.map(formatChatMessage).join("");
+        chatLogParent.scrollTop = chatLogParent.scrollHeight; // Scroll to bottom
+      }
+    }
+
+    /**
+     * Render activity log
+     * @param {string[]} activityData - Array of activity log strings
+     */
+    function renderActivity(activityData) {
+      const activityLog = document.getElementById("activityLog");
+      if (!activityLog) return; // Parent view might not be active
+
+      const formatActivity = (item) => {
+         if (!item) return '';
+         let icon = "fas fa-info-circle text-info";
+
+        // Simple keyword check for icons
+        if (item.includes("completed") || item.includes("✅")) {
+          icon = "fas fa-check-circle text-success";
+        } else if (item.includes("added") || item.includes("➕")) {
+          icon = "fas fa-plus-circle text-primary";
+        } else if (item.includes("level up") || item.includes("LEVEL UP") || item.includes("🎉")) {
+          icon = "fas fa-level-up-alt text-warning";
+        } else if (item.includes("joined") || item.includes("created")) {
+           icon = "fas fa-link text-info";
+        }
+
+        return `
+          <div class="log-item">
+            <i class="${icon} me-2"></i> ${escapeHtml(item)}
+          </div>
+        `;
+      };
+
+       const logHTML = activityData.length > 0
+        ? activityData.map(formatActivity).join("")
+        : '<div class="log-item text-muted">No activity yet.</div>';
+
+      activityLog.innerHTML = logHTML;
+      activityLog.scrollTop = activityLog.scrollHeight; // Scroll to bottom
+    }
+
+
+    /**
+     * Play level up animation and show toast
+     * @param {number} newLevel
+     */
+    function playLevelUpAnimation(newLevel) {
+      const levelElement = document.getElementById("playerLevel");
+      if (!levelElement) return;
+
+      levelElement.classList.add("level-up-animation");
+      showToast(`🎉 Congratulations! You've reached level ${newLevel}!`, 'warning');
+
+      setTimeout(() => {
+        levelElement.classList.remove("level-up-animation");
+      }, 2000); // Animation duration + buffer
+    }
+
+
+    /**
+     * Complete a chore - Player action, updates Firestore
+     * @param {number} index - The original index of the chore in the array (Firestore doesn't guarantee order)
+     * @param {string} choreText - The text of the chore being completed (for logging)
+     */
+    async function completeChore(index, choreText) {
+       if (!db || !connectionCode || currentRole !== 'player') {
+            showToast('Cannot complete quest now.', 'warning');
+            return;
+        }
+
+        // Disable button temporarily to prevent double clicks? (Optional)
+
+        const connectionRef = db.collection(CONNECTIONS_COLLECTION).doc(connectionCode);
+
+        try {
+             // Use a transaction to ensure data consistency (read chore list, update xp/level, remove chore)
+             await db.runTransaction(async (transaction) => {
+                const doc = await transaction.get(connectionRef);
+                if (!doc.exists) {
+                    throw new Error("Connection document not found.");
+                }
+
+                const data = doc.data();
+                const currentChores = data.chores || [];
+                let currentXP = data.xp || 0;
+                let currentLevel = data.level || 1;
+
+                // Find the specific chore to remove (safer than relying on index if array order changes)
+                 const choreToRemoveIndex = currentChores.findIndex(c => c === choreText);
+                 if (choreToRemoveIndex === -1) {
+                    console.warn(`Chore "${choreText}" not found in current list. Already completed?`);
+                    showToast(`Quest "${escapeHtml(choreText)}" might have already been completed.`, 'info');
+                    return; // Exit transaction gracefully
+                 }
+
+                 const completedChore = currentChores.splice(choreToRemoveIndex, 1)[0]; // Remove it
+
+
+                // --- Calculate XP and Level ---
+                currentXP += XP_PER_CHORE;
+                let xpNeeded = calculateXPNeeded(currentLevel);
+                let leveledUp = false;
+                let activityMessage = `Player completed: "${escapeHtml(completedChore)}" ✅`;
+
+                while (currentXP >= xpNeeded) {
+                    currentXP -= xpNeeded; // Reset XP for the new level
+                    currentLevel += 1;
+                    leveledUp = true;
+                    xpNeeded = calculateXPNeeded(currentLevel); // Calculate for the *next* level
+                    // Add level up message to activity log within the transaction
+                     activityMessage += ` | 🎉 LEVEL UP! Player reached level ${currentLevel}!`;
+                }
+                // --- End XP/Level Calculation ---
+
+
+                // Prepare update object
+                const updateData = {
+                    chores: currentChores, // The modified array
+                    xp: currentXP,
+                    level: currentLevel,
+                    activity: firebase.firestore.FieldValue.arrayUnion(activityMessage)
+                };
+
+                // Perform the update within the transaction
+                transaction.update(connectionRef, updateData);
+
+                // If level up occurred, trigger animation *after* transaction succeeds
+                // (We can't directly call UI functions inside transaction)
+                if (leveledUp) {
+                    // Use a slight delay to ensure data is likely rendered by onSnapshot
+                     setTimeout(() => playLevelUpAnimation(currentLevel), 500);
+                }
+             });
+
+            console.log(`Chore "${choreText}" completed successfully.`);
+            // UI update is handled by the onSnapshot listener
+            // showToast(`Quest "${escapeHtml(choreText)}" completed! +${XP_PER_CHORE} XP`, 'success'); // Optional feedback
+
+        } catch (error) {
+            console.error("Error completing chore:", error);
+            showToast(`Failed to complete quest: ${error.message}`, 'danger');
+        }
+    }
+
+    /**
+     * Add a new chore - Parent action, updates Firestore
+     */
+    async function addChore() {
+       if (!db || !connectionCode || currentRole !== 'parent') {
+           showToast('Cannot add quest now.', 'warning');
+           return;
+       }
+
+      const input = document.getElementById("newChore");
+      const chore = input.value.trim();
+
+      if (chore) {
+        const connectionRef = db.collection(CONNECTIONS_COLLECTION).doc(connectionCode);
+        const activityMessage = `Parent added: "${escapeHtml(chore)}" ➕`;
+
+        try {
+            await connectionRef.update({
+                chores: firebase.firestore.FieldValue.arrayUnion(chore), // Add to array
+                activity: firebase.firestore.FieldValue.arrayUnion(activityMessage) // Add activity log
+            });
+            input.value = ""; // Clear input on success
+            console.log(`Chore "${chore}" added successfully.`);
+            // UI update handled by onSnapshot listener
+            input.focus();
+        } catch (error) {
+            console.error("Error adding chore:", error);
+            showToast(`Failed to add quest: ${error.message}`, 'danger');
+        }
+      } else {
+          showToast("Please enter a quest description.", "info");
+      }
+    }
+
+    /**
+     * Send chat message - Updates Firestore
+     * @param {string} who - 'player' or 'parent'
+     */
+    async function sendMessage(who) {
+       if (!db || !connectionCode || currentRole !== who) {
+           showToast(`Cannot send message as ${who} now.`, 'warning');
+           return;
+       }
+
+      const inputId = who === "player" ? "playerMessage" : "parentMessage";
+      const input = document.getElementById(inputId);
+      const text = input.value.trim();
+
+      if (text) {
+        const connectionRef = db.collection(CONNECTIONS_COLLECTION).doc(connectionCode);
+        const message = {
+          who: who,
+          text: text,
+          timestamp: firebase.firestore.FieldValue.serverTimestamp() // Use server time
+        };
+
+        try {
+            await connectionRef.update({
+                chat: firebase.firestore.FieldValue.arrayUnion(message) // Add message to chat array
+            });
+            input.value = ""; // Clear input on success
+            console.log("Message sent successfully.");
+            // UI update handled by onSnapshot listener
+            input.focus();
+        } catch (error) {
+            console.error("Error sending message:", error);
+            showToast(`Failed to send message: ${error.message}`, 'danger');
+        }
+      }
+    }
+
+     /**
+      * Utility function to escape HTML to prevent XSS
+      * @param {string} str
+      * @returns {string}
+      */
+     function escapeHtml(str) {
+        if (str === null || str === '') {
+            return '';
+        }
+        const map = {
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#039;'
+        };
+        return str.replace(/[&<>"']/g, function(m) { return map[m]; });
+     }
+
+    /**
+     * Initialize the application event listeners
+     */
+    function init() {
+      // Add Enter key listeners for inputs
+      document.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+          const activeElement = document.activeElement;
+          if (!activeElement) return;
+
+           // Prevent Enter from submitting if connection isn't ready
+           if (!connectionCode && (activeElement.id === 'playerMessage' || activeElement.id === 'parentMessage' || activeElement.id === 'newChore')) {
+               e.preventDefault(); // Stop default action if not connected
+               return;
+           }
+
+          if (activeElement.id === 'playerMessage') {
+            e.preventDefault(); // Prevent default form submission/newline
+            sendMessage('player');
+          } else if (activeElement.id === 'parentMessage') {
+            e.preventDefault();
+            sendMessage('parent');
+          } else if (activeElement.id === 'newChore') {
+             e.preventDefault();
+            addChore();
+          } else if (activeElement.id === 'codeInput') {
+             e.preventDefault();
+            setupConnection(false); // Player connects on Enter
+          }
+        }
+      });
+
+      // Optional: Clean up listener when user leaves the page
+      window.addEventListener('beforeunload', () => {
+          if (unsubscribeFromUpdates) {
+              console.log("Stopping listener on page unload.");
+              unsubscribeFromUpdates();
+          }
+      });
+
+       console.log("ChoreQuest Initialized");
+       // Initial UI state is role selection, no connection yet
+        updateConnectionIndicator(false);
+    }
+
+    // Initialize the app when DOM is loaded
+    document.addEventListener("DOMContentLoaded", init);
+
+  </script>
+</body>
+</html>
