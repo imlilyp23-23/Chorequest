@@ -1038,27 +1038,30 @@
     const connectionRef = db.collection(CONNECTIONS_COLLECTION).doc(connectionCode);
     
     try {
-        // First get the current chat array
+        // Create a message without timestamp first
+        const message = {
+          who: who,
+          text: text,
+          // Don't include timestamp here - we'll add it server-side
+        };
+
+        // Get the current document
         const doc = await connectionRef.get();
         if (!doc.exists) {
-            throw new Error("Connection document not found.");
+            throw new Error("Connection document not found");
         }
         
-        const data = doc.data();
-        const currentChat = data.chat || [];
+        const currentChat = doc.data().chat || [];
         
-        // Add new message with serverTimestamp
-        const updatedChat = [...currentChat, {
-            who: who,
-            text: text,
-            timestamp: firebase.firestore.FieldValue.serverTimestamp()
-        }];
+        // Add the new message to the current chat array
+        const updatedChat = [...currentChat, message];
         
-        // Update the entire chat array
+        // Update the entire chat array at once
         await connectionRef.update({
-            chat: updatedChat
+            chat: updatedChat,
+            lastMessageTime: firebase.firestore.FieldValue.serverTimestamp() // Add timestamp as a separate field
         });
-        
+
         input.value = ""; // Clear input on success
         console.log("Message sent successfully.");
         input.focus();
@@ -1068,7 +1071,6 @@
     }
   }
 }
-
      /**
       * Utility function to escape HTML to prevent XSS
       * @param {string} str
